@@ -312,6 +312,106 @@ ggplot() +
   labs(y = expression(Optical~Density~log(OD["600"]))) +
   scale_fill_manual(values = c("#4080c0", "#684739"))
 
+#vario growth over 24hrs
+
+dat <- read.csv("data/growth_part1_vario_081222.csv",header=T)
+
+dat <- mutate(dat,
+              time_hr = time / 3600)
+
+#1 - 6 = V (minus rep 3). 7-12 = VP
+#C = rep 1, D = rep 2, E = rep 3
+
+dat <- dat %>%
+  separate(well, c("row", "col"))
+
+dat2 <- filter(dat, row == "B" | row == "C" | row == "D" | row == "E")
+
+dat2$treat <- as.numeric(dat2$col)
+
+dat2$treat[dat2$row == "C" & dat2$treat == 1 | dat2$row == "C" & dat2$treat == 2 | dat2$row == "C" & dat2$treat == 3 | dat2$row == "C" & dat2$treat == 4 | dat2$row == "C" & dat2$treat == 5 | dat2$row == "C" & dat2$treat == 6] <- "V"
+
+dat2$treat[dat2$row == "D" & dat2$treat == 1 | dat2$row == "D" & dat2$treat == 2 | dat2$row == "D" & dat2$treat == 3 | dat2$row == "D" & dat2$treat == 4 | dat2$row == "D" & dat2$treat == 5 | dat2$row == "D" & dat2$treat == 6] <- "V"
+
+dat2$treat[dat2$row == "E" & dat2$treat == 1 | dat2$row == "E" & dat2$treat == 2 | dat2$row == "E" & dat2$treat == 3 | dat2$row == "E" & dat2$treat == 4 | dat2$row == "E" & dat2$treat == 5 | dat2$row == "E" & dat2$treat == 6] <- "V"
+
+dat2$treat[dat2$row == "C" & dat2$treat == 7 | dat2$row == "C" & dat2$treat == 8 | dat2$row == "C" & dat2$treat == 9 | dat2$row == "C" & dat2$treat == 10 | dat2$row == "C" & dat2$treat == 11 | dat2$row == "C" & dat2$treat == 12] <- "VP"
+
+dat2$treat[dat2$row == "D" & dat2$treat == 7 | dat2$row == "D" & dat2$treat == 8 | dat2$row == "D" & dat2$treat == 9 | dat2$row == "D" & dat2$treat == 10 | dat2$row == "D" & dat2$treat == 11 | dat2$row == "D" & dat2$treat == 12] <- "VP"
+
+dat2$treat[dat2$row == "E" & dat2$treat == 7 | dat2$row == "E" & dat2$treat == 8 | dat2$row == "E" & dat2$treat == 9 | dat2$row == "E" & dat2$treat == 10 | dat2$row == "E" & dat2$treat == 11 | dat2$row == "E" & dat2$treat == 12] <- "VP"
+
+dat2$treat[dat2$row == "B"] <- "control"
+
+dat2$rep1 <- interaction(dat2$treat, dat2$col) #biological rep
+dat2$rep2 <- interaction(dat2$treat, dat2$row) #technical rep
+
+ggplot(dat2, aes(x = time_hr, y = od, col = rep1)) +
+  geom_point() +
+  facet_wrap(~treat)
+
+dat2 <- filter(dat2, ! treat == "control")
+
+ggplot(dat2, aes(x = time_hr, y = od, col = rep1)) +
+  geom_point() +
+  facet_wrap(~treat)
+
+dat2 <- filter(dat2, ! col == 4) #failed to grow
+
+dat2$od2 <- log(dat2$od)
+
+#rolling reg
+
+library(tidyverse) #install.packages(tidyverse)
+library(zoo) #install.packages(zoo)
+library(broom) #install.packages(broom)
+library(growthcurver) # install.packages(growthcurver)
+library(nls.multstart)
+
+roll_regress <- function(x){
+  temp <- data.frame(x)
+  mod <- lm(temp)
+  temp <- data.frame(slope = coef(mod)[[2]],
+                     slope_lwr = confint(mod)[2, ][[1]],
+                     slope_upr = confint(mod)[2, ][[2]],
+                     intercept = coef(mod)[[1]],
+                     rsq = summary(mod)$r.squared, stringsAsFactors = FALSE)
+  return(temp)
+}
+
+num_points = ceiling(1.5*60/(60*0.167)) 
+
+models <- dat2 %>%
+  group_by(rep1, rep2, treat) %>%
+  do(cbind(model = select(., od2, time_hr) %>% 
+             zoo::rollapplyr(width = num_points, roll_regress, by.column = FALSE, fill = NA, align = 'center'),
+           time = select(., time_hr),
+           ln_od = select(., od2))) %>%
+  rename_all(., gsub, pattern = 'model.', replacement = '')
+
+preds <- models %>%
+  filter(., !is.na(slope)) %>%
+  group_by(time_hr) %>%
+  do(data.frame(time2 = c(.$time_hr - 2, .$time_hr + 2))) %>%
+  left_join(., models) %>%
+  mutate(pred = (slope*time2) + intercept)
+
+preds <- models %>%
+  filter(., !is.na(slope)) %>%
+  left_join(., models) 
+
+growth_rate <- filter(models, slope == max(slope, na.rm = TRUE))
+
+grows <- group_by(growth_rate, rep1, treat) %>%
+  summarise(m.grow = mean(slope),
+            slope_lwr = mean(slope_lwr),
+            slope_upr = mean(slope_upr))
+
+mod1 <- lm(m.grow ~ treat, data = grows)
+mod2 <- lm(m.grow ~ 1, data = grows)
+anova(mod1,mod2,test="F")
+plot(mod1)
+
 ### Supernatent analysis
 
 sup <- read.csv("data/sup_assay_1w.csv",header=T)
