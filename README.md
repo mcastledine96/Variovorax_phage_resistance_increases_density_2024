@@ -1,6 +1,6 @@
 # Variovorax_phage_resistance_increases_density_2024
 
-Repository for the empirical data related to the manuscript "Bacteriophage resistance increases bacterial productivity by shifting population growth dynamics in a soil bacterium Variovorax sp." 
+Repository for the empirical data related to the manuscript "Phage resistance is associated with density increases in the soil bacterium Variovorax sp. and results in changes to community structure"
 
 Any issues, please contact lead author Dr Meaghan Castledine m.castledine@exeter.ac.uk
 
