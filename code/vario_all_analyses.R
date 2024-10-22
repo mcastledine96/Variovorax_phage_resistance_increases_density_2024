@@ -253,7 +253,7 @@ ggplot(res, aes(x = treat, y = m)) +
   geom_point(position = position_jitter(0.05), shape = 21, fill = "white", size = 3)+
   xlab("Clone") +
   theme_bw() +
-  theme(axis.text = element_text(size = 14, colour = 'black'), axis.title = element_text(size = 14, colour = 'black'), strip.background = element_blank(), legend.position = "none") +
+  theme(axis.text = element_text(size = 12, colour = 'black'), axis.title = element_text(size = 14, colour = 'black'), strip.background = element_blank(), legend.position = "none") +
   scale_color_manual(values = c("black", "#4080c0", "#684739")) +
   scale_fill_manual(values = c("black", "#4080c0", "#684739")) +
   ylab("Relative fitness") +
